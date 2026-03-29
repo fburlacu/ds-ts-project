@@ -43,18 +43,10 @@ def data_provider(args, flag):
             freq=freq,
             seasonal_patterns=args.seasonal_patterns
         )
-    else:
+    if args.data == 'PTBXL':  #Picks Dataset_PTBXL when args.data == 'PTBXL'.
         data_set = Data(
             root_path=args.root_path,
-            data_path=args.data_path,
-            flag=flag,
-            size=[args.seq_len, args.label_len, args.pred_len],
-            features=args.features,
-            target=args.target,
-            timeenc=timeenc,
-            freq=freq,
-            percent=percent,
-            seasonal_patterns=args.seasonal_patterns
+            flag=flag
         )
     data_loader = DataLoader(
         data_set,

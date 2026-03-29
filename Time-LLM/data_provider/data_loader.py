@@ -16,9 +16,9 @@ class Dataset_ETT_hour(Dataset):
                  target='OT', scale=True, timeenc=0, freq='h', percent=100,
                  seasonal_patterns=None):
         if size == None:
-            self.seq_len = 24 * 4 * 4
+            self.seq_len   = 24 * 4 * 4
             self.label_len = 24 * 4
-            self.pred_len = 24 * 4
+            self.pred_len  = 24 * 4
         else:
             self.seq_len = size[0]
             self.label_len = size[1]
@@ -396,6 +396,7 @@ from sklearn.preprocessing import StandardScaler
 
 class Dataset_PTBXL(Dataset):
     def __init__(self, root_path, flag='train', scale=True):
+        self.scale = scale
         assert flag in ['train', 'val', 'test']
 
         # 1. Load metadata
@@ -410,10 +411,10 @@ class Dataset_PTBXL(Dataset):
         diag_scp = set(scp[scp.diagnostic == 1].index)
 
         def get_label(scp_codes):
-            # NORM likelihood > 50 -> normal (0)
+            # if the norm score > 50 ==> label = 0 (normal)
             if scp_codes.get('NORM', 0) > 50:
                 return 0
-            # NORM absent/low, but some other diagnostic code > 50 -> abnormal (1)
+            # if any diesease score > 50 then label = 1 (abnormal)
             if any(v > 50 for k, v in scp_codes.items() if k != 'NORM'):
                 return 1
             # NORM absent/low and no confident abnormal code -> discard (-1)
@@ -423,29 +424,34 @@ class Dataset_PTBXL(Dataset):
         df = df[df['label'] != -1].copy()
 
         # 3. Split by strat_fold (given) for fine tuning classification head
-        fold_map = {'train': list(range(1, 9)), 'val': [9], 'test': [10]}
-        df = df[df.strat_fold.isin(fold_map[flag])].copy()
+        fold_map = {'train': list(range(1, 9)), 'val': [9], 'test': [10]} 
+        df = df[df.strat_fold.isin(fold_map[flag])].copy() #“Is this row’s strat_fold in the allowed list?”
 
         # 4. Load signals
         def load_signal(row):
-            path = os.path.join(root_path, row.filename_lr)
-            signal, _ = wfdb.rdsamp(path)
-            return signal.astype(np.float32)   # (1000, 12)
+            path = os.path.join(root_path, row.filename_lr)  #root_path ="/data/PTBXL" row.filename_lr = "records/00001_lr"
+            signal, _ = wfdb.rdsamp(path) #reads ECG signal from file
+            
+            if self.scale:  #added scale
+                mean = signal.mean(axis = 0, keepdims = True)
+                std  = signal.std(axis = 0, keepdims = True) + 1e-8
+                signal = (signal - mean) /std
+            return signal   # (1000, 12)  1000 timesteps and 12 ECG channels
         signals = np.stack(df.apply(load_signal, axis=1).values)  # (N, 1000, 12)
 
-        self.x = torch.tensor(signals)                        # (N, 1000, 12)
+        self.x = torch.tensor(signals)                        # (N, 1000, 12)  number of FCG signals
         self.y = torch.tensor(df['label'].values, dtype=torch.long)  # (N,)
         # report column: fill missing values with empty string
         self.reports = df['report'].fillna('').tolist()       # list[str], len N
         # dummy time marks — classification doesn't use them
-        self.x_mark = torch.zeros(len(self.x), self.x.shape[1], 4)
+        self.x_mark = torch.zeros(len(self.x), self.x.shape[1], 4) #(filled with zeroes)
 
     def __len__(self):
         return len(self.x)
 
     def __getitem__(self, idx):
-        return (self.x[idx],          # (T, 12)  float32
-                self.y[idx],          # ()        int64
+        return (self.x[idx],          # (T, 12)  float32 timesteps and 12 ECG channels
+                self.y[idx],          # ()        int64  this is a single number ==> normal or not normal
                 self.x_mark[idx],     # (T, 4)   float32
                 self.x_mark[idx],     # dummy y_mark
                 self.reports[idx])    # str
