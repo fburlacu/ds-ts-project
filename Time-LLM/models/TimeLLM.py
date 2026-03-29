@@ -39,6 +39,7 @@ class Model(nn.Module):
         self.d_llm = configs.llm_dim
         self.patch_len = configs.patch_len
         self.stride = configs.stride
+ 
 
         if configs.llm_model == 'LLAMA':
             # self.llama_config = LlamaConfig.from_pretrained('/mnt/alps/modelhub/pretrained_model/LLaMA/7B_hf/')
@@ -191,7 +192,7 @@ class Model(nn.Module):
             self.act = nn.GELU()
             self.dropout_cls = nn.Dropout(configs.dropout)
             # Pool over patch tokens, then project to num classes
-            self.classifier = nn.Linear(self.d_llm, configs.num_class)
+            self.classifier = nn.Linear(self.d_llm, 1)
         ###################################
         else:
             raise NotImplementedError
@@ -238,15 +239,15 @@ class Model(nn.Module):
         )
     ##########################################################
 
-    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec, mask=None, reports=None):
+    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec , mask=None, report=None):
         if self.task_name == 'long_term_forecast' or self.task_name == 'short_term_forecast':
             dec_out = self.forecast(x_enc, x_mark_enc, x_dec, x_mark_dec)
             return dec_out[:, -self.pred_len:, :]
         if self.task_name == 'classification':
-            return self.classify(x_enc, reports=reports)
+            return self.classify(x_enc, report=report)
         return None
 
-    def classify(self, x_enc, reports=None):
+    def classify(self, x_enc, report=None):
         x_enc = self.normalize_layers(x_enc, 'norm')
 
         B, T, N = x_enc.size()
@@ -261,8 +262,8 @@ class Model(nn.Module):
         prompt = []
         for b in range(x_enc.shape[0]):   # iterates B * N
             orig_b = b // N               # maps back to original batch sample
-            report = (reports[orig_b]
-                    if (reports is not None and orig_b < len(reports))
+            report = (report[orig_b]
+                    if (report is not None and orig_b < len(report))
                     else "")
             prompt.append(self._build_prompt(
                 min_val_str    = str(min_values[b].tolist()[0]),
@@ -271,6 +272,7 @@ class Model(nn.Module):
                 trend_str      = 'upward' if trends[b] > 0 else 'downward',
                 lags_str       = str(lags[b].tolist()),
                 report         = report,
+           
             ))
 
         x_enc = x_enc.reshape(B, N, T).permute(0, 2, 1).contiguous()
@@ -285,7 +287,7 @@ class Model(nn.Module):
         ).permute(1, 0)
 
         x_enc = x_enc.permute(0, 2, 1).contiguous()
-        enc_out, n_vars = self.patch_embedding(x_enc.to(torch.bfloat16))
+        enc_out, n_vars = self.patch_embedding(x_enc)
         enc_out = self.reprogramming_layer(enc_out, source_embeddings, source_embeddings)
 
         llm_input = torch.cat([prompt_embeddings, enc_out], dim=1)
@@ -331,7 +333,7 @@ class Model(nn.Module):
         source_embeddings = self.mapping_layer(self.word_embeddings.permute(1, 0)).permute(1, 0)
 
         x_enc = x_enc.permute(0, 2, 1).contiguous()
-        enc_out, n_vars = self.patch_embedding(x_enc.to(torch.bfloat16))
+        enc_out, n_vars = self.patch_embedding(x_enc)
         enc_out = self.reprogramming_layer(enc_out, source_embeddings, source_embeddings)
         llama_enc_out = torch.cat([prompt_embeddings, enc_out], dim=1)
         dec_out = self.llm_model(inputs_embeds=llama_enc_out).last_hidden_state
@@ -369,8 +371,10 @@ class ReprogrammingLayer(nn.Module):
         self.value_projection = nn.Linear(d_llm, d_keys * n_heads)
         self.out_projection = nn.Linear(d_keys * n_heads, d_llm)
         self.n_heads = n_heads
-        self.dropout = nn.Dropout(attention_dropout)
+        self.dropout = nn.Dropout(attention_dropout)   
+   
 
+   #hhh
     def forward(self, target_embedding, source_embedding, value_embedding):
         B, L, _ = target_embedding.shape
         S, _ = source_embedding.shape
