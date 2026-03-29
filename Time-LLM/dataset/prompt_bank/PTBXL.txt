@@ -1,0 +1,4 @@
+<|start_prompt|>
+dataset description: the PTBXL ECG dataset contains 12-lead electrocardiogram recordings labeled as normal or abnormal.
+task description: classify whether this recording is normal or abnormal given the previous timesteps 
+<|end_prompt|>
