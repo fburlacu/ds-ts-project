@@ -43,7 +43,7 @@ class EarlyStopping:
         self.counter = 0
         self.best_score = None
         self.early_stop = False
-        self.val_loss_min = np.Inf
+        self.val_loss_min = np.inf
         self.delta = delta
         self.save_mode = save_mode
 
@@ -184,6 +184,126 @@ def vali(args, accelerator, model, vali_data, vali_loader, criterion, mae_metric
 
     model.train()
     return total_loss, total_mae_loss
+
+
+def validation_classification(args, accelerator, model, vali_loader, criterion):
+    total_loss = []
+    all_preds  = []
+    all_labels = []
+
+    model.eval()
+    with torch.no_grad():
+        for batch in tqdm(vali_loader):
+ 
+            if len(batch) == 5:
+                batch_x, batch_y, batch_x_mark, batch_y_mark, reports = batch
+                extra = None
+            else:
+                batch_x, batch_y, batch_x_mark, batch_y_mark = batch
+                reports = None
+                extra   = None
+
+            batch_x = batch_x.float().to(accelerator.device)
+            batch_y = batch_y.long().to(accelerator.device) 
+
+
+            if args.use_amp:
+                with torch.cuda.amp.autocast():
+                    outputs = model(
+                        batch_x, batch_x_mark,
+                        None, None,
+                        extra=extra,
+                        reports=reports
+                    )
+            else:
+                outputs = model(
+                    batch_x, batch_x_mark,
+                    None, None,
+                    extra=extra,
+                    reports=reports
+                )
+
+            outputs, batch_y = accelerator.gather_for_metrics((outputs, batch_y))
+
+            loss = criterion(outputs, batch_y)
+            total_loss.append(loss.item())
+            
+            
+            preds = torch.sigmoid(outputs).detach().cpu().numpy()  
+            preds = (preds > 0.5).astype(int)                     
+            labels = batch_y.detach().cpu().numpy()
+            all_preds.append(preds)
+            all_labels.append(labels)
+
+
+    total_loss = np.average(total_loss)
+    all_preds  = np.concatenate(all_preds)
+    all_labels = np.concatenate(all_labels)
+    accuracy   = cal_accuracy(all_preds, all_labels)
+
+    model.train()
+    return total_loss, accuracy
+
+
+def test_classification(args, accelerator, model, train_loader, vali_loader, criterion):
+    all_preds = []
+    all_labels = []
+    total_loss = []
+
+    model.eval()
+    with torch.no_grad():
+        for batch in tqdm(vali_loader, desc="Testing", leave=False):
+          
+            if len(batch) == 5:
+                batch_x, batch_y, batch_x_mark, batch_y_mark, reports = batch
+                extra = None
+            else:
+                batch_x, batch_y, batch_x_mark, batch_y_mark = batch
+                reports = None
+                extra = None
+
+            batch_x = batch_x.float().to(accelerator.device)
+            batch_y = batch_y.float().to(accelerator.device)  # BCE expects float labels
+
+            # forward pass
+            if args.use_amp:
+                with torch.cuda.amp.autocast():
+                    outputs = model(
+                        batch_x, batch_x_mark,
+                        None, None,
+                        extra=extra,
+                        reports=reports
+                    )
+            else:
+                outputs = model(
+                    batch_x, batch_x_mark,
+                    None, None,
+                    extra=extra,
+                    reports=reports
+                )
+
+            outputs, batch_y = accelerator.gather_for_metrics((outputs, batch_y))
+
+  
+            loss = criterion(outputs, batch_y)
+            total_loss.append(loss.item())
+
+          
+            preds = torch.sigmoid(outputs)
+            preds = (preds > 0.5).float().detach().cpu().numpy()
+            labels = batch_y.detach().cpu().numpy()
+
+            all_preds.append(preds)
+            all_labels.append(labels)
+
+    total_loss = np.mean(total_loss)
+    all_preds = np.concatenate(all_preds)
+    all_labels = np.concatenate(all_labels)
+    accuracy = np.mean(all_preds == all_labels)
+
+    model.train()
+    return total_loss, accuracy
+
 
 
 def test(args, accelerator, model, train_loader, vali_loader, criterion):
