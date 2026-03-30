@@ -196,15 +196,13 @@ def validation_classification(args, accelerator, model, vali_loader, criterion):
         for batch in tqdm(vali_loader):
  
             if len(batch) == 5:
-                batch_x, batch_y, batch_x_mark, batch_y_mark, reports = batch
-                extra = None
+                batch_x, batch_y, batch_x_mark, batch_y_mark, report = batch
             else:
                 batch_x, batch_y, batch_x_mark, batch_y_mark = batch
-                reports = None
-                extra   = None
+                report = None
 
             batch_x = batch_x.float().to(accelerator.device)
-            batch_y = batch_y.long().to(accelerator.device) 
+            batch_y = batch_y.float().to(accelerator.device)
 
 
             if args.use_amp:
@@ -212,15 +210,13 @@ def validation_classification(args, accelerator, model, vali_loader, criterion):
                     outputs = model(
                         batch_x, batch_x_mark,
                         None, None,
-                        extra=extra,
-                        reports=reports
+                        report=report
                     )
             else:
                 outputs = model(
                     batch_x, batch_x_mark,
                     None, None,
-                    extra=extra,
-                    reports=reports
+                    report=report
                 )
 
             outputs, batch_y = accelerator.gather_for_metrics((outputs, batch_y))
@@ -255,12 +251,10 @@ def test_classification(args, accelerator, model, train_loader, vali_loader, cri
         for batch in tqdm(vali_loader, desc="Testing", leave=False):
           
             if len(batch) == 5:
-                batch_x, batch_y, batch_x_mark, batch_y_mark, reports = batch
-                extra = None
+                batch_x, batch_y, batch_x_mark, batch_y_mark, report = batch
             else:
                 batch_x, batch_y, batch_x_mark, batch_y_mark = batch
-                reports = None
-                extra = None
+                report = None
 
             batch_x = batch_x.float().to(accelerator.device)
             batch_y = batch_y.float().to(accelerator.device)  # BCE expects float labels
@@ -271,15 +265,13 @@ def test_classification(args, accelerator, model, train_loader, vali_loader, cri
                     outputs = model(
                         batch_x, batch_x_mark,
                         None, None,
-                        extra=extra,
-                        reports=reports
+                        report=report
                     )
             else:
                 outputs = model(
                     batch_x, batch_x_mark,
                     None, None,
-                    extra=extra,
-                    reports=reports
+                    report=report
                 )
 
             outputs, batch_y = accelerator.gather_for_metrics((outputs, batch_y))
