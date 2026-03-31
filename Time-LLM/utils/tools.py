@@ -194,7 +194,7 @@ def validation_classification(args, accelerator, model, vali_loader, criterion):
     model.eval()
     with torch.no_grad():
         for batch in tqdm(vali_loader):
- 
+
             if len(batch) == 5:
                 batch_x, batch_y, batch_x_mark, batch_y_mark, report = batch
             else:
@@ -202,8 +202,7 @@ def validation_classification(args, accelerator, model, vali_loader, criterion):
                 report = None
 
             batch_x = batch_x.float().to(accelerator.device)
-            batch_y_mark = batch_y_mark.unsqueeze(1).float().to(accelerator.device)
-
+            batch_y = batch_y.float().unsqueeze(1).to(accelerator.device)  
 
             if args.use_amp:
                 with torch.cuda.amp.autocast():
@@ -223,14 +222,13 @@ def validation_classification(args, accelerator, model, vali_loader, criterion):
 
             loss = criterion(outputs, batch_y)
             total_loss.append(loss.item())
-            
-            
-            preds = torch.sigmoid(outputs).detach().cpu().numpy()  
-            preds = (preds > 0.5).astype(int)                     
+
+            preds = torch.sigmoid(outputs).detach().cpu().numpy()
+            preds = (preds > 0.5).astype(int)
             labels = batch_y.detach().cpu().numpy()
+
             all_preds.append(preds)
             all_labels.append(labels)
-
 
     total_loss = np.average(total_loss)
     all_preds  = np.concatenate(all_preds)
@@ -240,16 +238,15 @@ def validation_classification(args, accelerator, model, vali_loader, criterion):
     model.train()
     return total_loss, accuracy
 
-
-def test_classification(args, accelerator, model, train_loader, vali_loader, criterion):
+def test_classification(args, accelerator, model, data_loader, criterion):
     all_preds = []
     all_labels = []
     total_loss = []
 
     model.eval()
     with torch.no_grad():
-        for batch in tqdm(vali_loader, desc="Testing", leave=False):
-          
+        for batch in tqdm(data_loader, desc="Testing", leave=False):
+
             if len(batch) == 5:
                 batch_x, batch_y, batch_x_mark, batch_y_mark, report = batch
             else:
@@ -257,9 +254,8 @@ def test_classification(args, accelerator, model, train_loader, vali_loader, cri
                 report = None
 
             batch_x = batch_x.float().to(accelerator.device)
-            batch_y_mark = batch_y_mark.unsqueeze(1).float().to(accelerator.device)
+            batch_y = batch_y.float().unsqueeze(1).to(accelerator.device)  
 
-            # forward pass
             if args.use_amp:
                 with torch.cuda.amp.autocast():
                     outputs = model(
@@ -276,11 +272,9 @@ def test_classification(args, accelerator, model, train_loader, vali_loader, cri
 
             outputs, batch_y = accelerator.gather_for_metrics((outputs, batch_y))
 
-  
             loss = criterion(outputs, batch_y)
             total_loss.append(loss.item())
 
-          
             preds = torch.sigmoid(outputs)
             preds = (preds > 0.5).float().detach().cpu().numpy()
             labels = batch_y.detach().cpu().numpy()
@@ -295,6 +289,9 @@ def test_classification(args, accelerator, model, train_loader, vali_loader, cri
 
     model.train()
     return total_loss, accuracy
+
+  
+  
 
 
 
