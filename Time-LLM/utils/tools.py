@@ -202,7 +202,7 @@ def validation_classification(args, accelerator, model, vali_loader, criterion):
                 report = None
 
             batch_x = batch_x.float().to(accelerator.device)
-            batch_y = batch_y.float().to(accelerator.device)
+            batch_y_mark = batch_y_mark.unsqueeze(1).float().to(accelerator.device)
 
 
             if args.use_amp:
