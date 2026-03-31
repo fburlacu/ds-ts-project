@@ -144,7 +144,7 @@ def vali(args, accelerator, model, vali_data, vali_loader, criterion, mae_metric
             batch_y = batch_y.float()
 
             batch_x_mark = batch_x_mark.float().to(accelerator.device)
-            batch_y_mark = batch_y_mark.float().to(accelerator.device)
+            batch_y_mark = batch_y_mark.unsqueeze(1).float().to(accelerator.device)
 
             # decoder input
             dec_inp = torch.zeros_like(batch_y[:, -args.pred_len:, :]).float()
@@ -257,7 +257,7 @@ def test_classification(args, accelerator, model, train_loader, vali_loader, cri
                 report = None
 
             batch_x = batch_x.float().to(accelerator.device)
-            batch_y = batch_y.float().to(accelerator.device)  # BCE expects float labels
+            batch_y_mark = batch_y_mark.unsqueeze(1).float().to(accelerator.device)
 
             # forward pass
             if args.use_amp:
