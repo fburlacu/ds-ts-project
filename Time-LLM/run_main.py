@@ -184,7 +184,7 @@ for epoch in range(args.train_epochs):
 
         batch_x = batch_x.float().to(accelerator.device)
         batch_x_mark = batch_x_mark.float().to(accelerator.device)
-        batch_y_mark = batch_y_mark.float().to(accelerator.device)
+        batch_y_mark = batch_y_mark.unsqueeze(1).float().to(accelerator.device)
 
         if 'classification' in args.task_name:
         
