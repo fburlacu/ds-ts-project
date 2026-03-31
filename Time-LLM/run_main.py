@@ -219,7 +219,14 @@ for epoch in range(args.train_epochs):
 
     if 'classification' in args.task_name:
         vali_loss, vali_acc = validation_classification(args, accelerator, model, vali_loader, nn.BCEWithLogitsLoss())
-        test_loss, test_acc = test_classification(args, accelerator, model, test_loader, nn.BCEWithLogitsLoss())
+        test_loss, test_acc = test_loss, test_acc = test_classification(
+        args,
+        accelerator,
+        model,
+        train_loader,              
+        test_loader,
+        nn.BCEWithLogitsLoss()
+    )
         accelerator.print(
             f"Epoch {epoch+1} | Train Loss: {epoch_train_loss:.7f} "
             f"Vali Loss: {vali_loss:.7f} Acc: {vali_acc:.4f} "
