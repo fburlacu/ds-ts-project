@@ -184,14 +184,14 @@ for epoch in range(args.train_epochs):
 
         batch_x = batch_x.float().to(accelerator.device)
         batch_x_mark = batch_x_mark.float().to(accelerator.device)
-        batch_y_mark = batch_y_mark.unsqueeze(1).float().to(accelerator.device)
+        batch_y_mark = batch_y_mark.float().to(accelerator.device)
 
         if 'classification' in args.task_name:
         
             x_dec = torch.zeros((batch_x.size(0), 1, args.dec_in), device=accelerator.device)
             x_mark_dec = torch.zeros((batch_x.size(0), 1, batch_x_mark.size(2)), device=accelerator.device)
             outputs = model(batch_x, batch_x_mark, x_dec, x_mark_dec, report=report)
-            loss = nn.BCEWithLogitsLoss()(outputs.squeeze(), batch_y.float())
+            loss = nn.BCEWithLogitsLoss()(outputs.squeeze(1), batch_y.float().to(accelerator.device))
         else:
             # forecasting forward
             dec_inp = torch.zeros_like(batch_y[:, -args.pred_len:, :]).to(accelerator.device)
@@ -223,7 +223,6 @@ for epoch in range(args.train_epochs):
         args,
         accelerator,
         model,
-        train_loader,              
         test_loader,
         nn.BCEWithLogitsLoss()
     )

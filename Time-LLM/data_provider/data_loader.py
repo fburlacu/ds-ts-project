@@ -432,14 +432,14 @@ class Dataset_PTBXL(Dataset):
             path = os.path.join(root_path, row.filename_lr)  #root_path ="/data/PTBXL" row.filename_lr = "records/00001_lr"
             signal, _ = wfdb.rdsamp(path) #reads ECG signal from file
             
-            if self.scale:  #added scale
-                mean = signal.mean(axis = 0, keepdims = True)
-                std  = signal.std(axis = 0, keepdims = True) + 1e-8
-                signal = (signal - mean) /std
+            # if self.scale:  #added scale
+            #     mean = signal.mean(axis = 0, keepdims = True)
+            #     std  = signal.std(axis = 0, keepdims = True) + 1e-8
+            #     signal = (signal - mean) /std
             return signal   # (1000, 12)  1000 timesteps and 12 ECG channels
         signals = np.stack(df.apply(load_signal, axis=1).values)  # (N, 1000, 12)
 
-        self.x = torch.tensor(signals)                        # (N, 1000, 12)  number of FCG signals
+        self.x = torch.tensor(signals, dtype=torch.float32)                        # (N, 1000, 12)  number of FCG signals
         self.y = torch.tensor(df['label'].values, dtype=torch.long)  # (N,)
         # report column: fill missing values with empty string
         self.reports = df['report'].fillna('').tolist()       # list[str], len N

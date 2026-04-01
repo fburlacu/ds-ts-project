@@ -262,9 +262,10 @@ class Model(nn.Module):
         prompt = []
         for b in range(x_enc.shape[0]):   # iterates B * N
             orig_b = b // N               # maps back to original batch sample
-            report = (report[orig_b]
-                    if (report is not None and orig_b < len(report))
-                    else "")
+            rpt = (report[orig_b]
+                if (report is not None and orig_b < len(report))
+                else "")
+            report = rpt 
             prompt.append(self._build_prompt(
                 min_val_str    = str(min_values[b].tolist()[0]),
                 max_val_str    = str(max_values[b].tolist()[0]),
@@ -295,7 +296,8 @@ class Model(nn.Module):
         # dec_out: (B*N, prompt_tokens + n_patches, d_llm)
 
         # pool over tokens, then over channels
-        dec_out = dec_out.mean(dim=1)                            # (B*N, d_llm)
+        n_patches = enc_out.shape[1]
+        dec_out = dec_out[:, -n_patches:, :].mean(dim=1)   # (B*N, d_llm)
         dec_out = dec_out.reshape(B, N, self.d_llm).mean(dim=1) # (B, d_llm)
 
         dec_out = self.act(dec_out)
